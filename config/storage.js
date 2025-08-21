@@ -1,4 +1,4 @@
-const { S3Client } = require('@aws-sdk/client-s3');
+import { S3Client } from '@aws-sdk/client-s3';
 
 const r2Client = new S3Client({
   region: 'auto',
@@ -9,7 +9,5 @@ const r2Client = new S3Client({
   },
 });
 
-module.exports = {
-  r2Client,
-  bucketName: process.env.CLOUDFLARE_R2_BUCKET_NAME
-};
+const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME;
+export { r2Client, bucketName };

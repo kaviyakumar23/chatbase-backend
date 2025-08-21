@@ -23,7 +23,7 @@ const sendPaginated = (res, data, pagination, message = 'Success') => {
   });
 };
 
-module.exports = {
+export {
   sendSuccess,
   sendError,
   sendPaginated

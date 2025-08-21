@@ -1,8 +1,8 @@
-const { requireAuth, optionalAuth } = require('./auth');
-const { errorHandler, notFound, asyncHandler } = require('./errorHandler');
-const { handleValidationErrors } = require('./validation');
+import { requireAuth, optionalAuth } from './auth.js';
+import { errorHandler, notFound, asyncHandler } from './errorHandler.js';
+import { handleValidationErrors } from './validation.js';
 
-module.exports = {
+export {
   requireAuth,
   optionalAuth,
   errorHandler,

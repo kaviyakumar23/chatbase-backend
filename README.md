@@ -55,44 +55,25 @@ A production-ready Node.js backend with Express, featuring integrations with Sup
 ## API Endpoints
 
 ### Health Check
-- `GET /api/v1/health` - Server status
+- `GET /api/v1/health` - Server status and uptime information
 
-### Users (Supabase)
-- `GET /api/v1/users/me` - Get current user
-- `GET /api/v1/users` - List users (paginated)
-- `POST /api/v1/users` - Create user
-- `GET /api/v1/users/:id` - Get user by ID
-- `PUT /api/v1/users/:id` - Update user
-- `DELETE /api/v1/users/:id` - Delete user
+## Testing API Keys
 
-### Files (Cloudflare R2)
-- `POST /api/v1/files/upload` - Upload single file
-- `POST /api/v1/files/upload/multiple` - Upload multiple files
-- `GET /api/v1/files/download/:key` - Download file
-- `DELETE /api/v1/files/:key` - Delete file
-- `POST /api/v1/files/presigned-upload` - Get presigned upload URL
-- `GET /api/v1/files/presigned-download/:key` - Get presigned download URL
+To verify that all your API keys are working correctly, run:
 
-### Vectors (Pinecone)
-- `GET /api/v1/vectors/stats` - Index statistics
-- `POST /api/v1/vectors/upsert` - Insert/update vectors
-- `POST /api/v1/vectors/batch-upsert` - Batch insert vectors
-- `POST /api/v1/vectors/query` - Query vectors by similarity
-- `GET /api/v1/vectors/query/:id` - Query vectors by ID
-- `POST /api/v1/vectors/fetch` - Fetch vectors by IDs
-- `DELETE /api/v1/vectors` - Delete vectors
-- `PUT /api/v1/vectors/:id` - Update vector
+```bash
+npm run test-keys
+```
 
-### Examples
-- `POST /api/v1/examples/complete-workflow` - Demonstrates all integrations
-- `GET /api/v1/examples/semantic-search/:query` - Semantic search example
-- `GET /api/v1/examples/user-analytics/:userId` - User analytics
-- `POST /api/v1/examples/bulk-operations` - Bulk operations example
-- `GET /api/v1/examples/realtime-demo` - Real-time subscriptions demo
+This will test connections to:
+- **Supabase** - Database connection and authentication
+- **Cloudflare R2** - Object storage connection
+- **Pinecone** - Vector database connection
+- **Clerk** - Authentication service connection
 
 ## Authentication
 
-All routes except `/health` require Clerk JWT authentication. Include the token in the Authorization header:
+Currently, only the health endpoint is available and does not require authentication. When you add more endpoints, you can configure Clerk JWT authentication by including the token in the Authorization header:
 
 ```bash
 Authorization: Bearer <clerk-jwt-token>
@@ -123,62 +104,7 @@ The API returns consistent error responses:
 - Input validation with express-validator
 - JWT token validation
 
-## Example Usage
 
-### Upload and Process File with Vector Storage
-
-```javascript
-// Upload file
-const formData = new FormData();
-formData.append('file', fileBlob);
-
-const uploadResponse = await fetch('/api/v1/files/upload', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${clerkToken}`
-  },
-  body: formData
-});
-
-// Store vector representation
-const vectorResponse = await fetch('/api/v1/vectors/upsert', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${clerkToken}`,
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    vectors: [{
-      id: 'file-123',
-      values: embeddings, // Your embeddings array
-      metadata: {
-        filename: 'document.pdf',
-        fileKey: uploadResponse.data.key
-      }
-    }]
-  })
-});
-```
-
-### Semantic Search
-
-```javascript
-const searchResponse = await fetch('/api/v1/vectors/query', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${clerkToken}`,
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    vector: queryEmbedding,
-    topK: 10,
-    includeMetadata: true,
-    filter: {
-      type: 'document'
-    }
-  })
-});
-```
 
 ## License
 

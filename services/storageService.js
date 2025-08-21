@@ -1,6 +1,6 @@
-const { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { r2Client, bucketName } = require('../config/storage');
+import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { r2Client, bucketName } from '../config/storage.js';
 
 class StorageService {
   async uploadFile(key, buffer, contentType, metadata = {}) {
@@ -85,4 +85,4 @@ class StorageService {
   }
 }
 
-module.exports = new StorageService();
+export default new StorageService();

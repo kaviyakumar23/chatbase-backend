@@ -1,8 +1,4 @@
-const express = require('express');
-const userRoutes = require('./userRoutes');
-const fileRoutes = require('./fileRoutes');
-const vectorRoutes = require('./vectorRoutes');
-const exampleRoutes = require('./exampleRoutes');
+import express from 'express';
 
 const router = express.Router();
 
@@ -15,9 +11,4 @@ router.get('/health', (req, res) => {
   });
 });
 
-router.use('/users', userRoutes);
-router.use('/files', fileRoutes);
-router.use('/vectors', vectorRoutes);
-router.use('/examples', exampleRoutes);
-
-module.exports = router;
+export default router;

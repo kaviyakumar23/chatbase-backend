@@ -1,4 +1,4 @@
-const { getIndex } = require('../config/vector');
+import { getIndex } from '../config/vector.js';
 
 class VectorService {
   constructor() {
@@ -93,4 +93,4 @@ class VectorService {
   }
 }
 
-module.exports = new VectorService();
+export default new VectorService();

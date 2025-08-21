@@ -1,13 +1,14 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const rateLimit = require('express-rate-limit');
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import { clerkMiddleware } from '@clerk/express';
 
-const config = require('./config');
-const routes = require('./routes');
-const { errorHandler, notFound } = require('./middleware');
-const logger = require('./utils/logger');
+import config from './config/index.js';
+import routes from './routes/index.js';
+import { errorHandler, notFound } from './middleware/index.js';
+import logger from './utils/logger.js';
 
 const app = express();
 
@@ -40,6 +41,8 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+app.use(clerkMiddleware());
+
 app.use('/api/v1', routes);
 
 app.use(notFound);
@@ -51,12 +54,6 @@ const server = app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT} in ${config.nodeEnv} mode`);
   logger.info('Available routes:');
   logger.info('  GET  /api/v1/health');
-  logger.info('  POST /api/v1/users');
-  logger.info('  GET  /api/v1/users');
-  logger.info('  GET  /api/v1/users/me');
-  logger.info('  POST /api/v1/files/upload');
-  logger.info('  POST /api/v1/vectors/upsert');
-  logger.info('  POST /api/v1/vectors/query');
 });
 
 const gracefulShutdown = (signal) => {
@@ -70,4 +67,4 @@ const gracefulShutdown = (signal) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-module.exports = app;
+export default app;

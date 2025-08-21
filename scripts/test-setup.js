@@ -1,5 +1,5 @@
-const config = require('../config');
-const logger = require('../utils/logger');
+import config from '../config/index.js';
+import logger from '../utils/logger.js';
 
 async function testSetup() {
   logger.info('Testing backend setup...');
@@ -22,9 +22,9 @@ async function testSetup() {
   }
   
   try {
-    const { supabase } = require('../config/database');
-    const { r2Client } = require('../config/storage');
-    const { pinecone } = require('../config/vector');
+    const { supabase } = await import('../config/database.js');
+    const { r2Client } = await import('../config/storage.js');
+    const { pinecone } = await import('../config/vector.js');
     
     logger.info('✓ All configurations loaded successfully');
     logger.info('✓ Supabase client initialized');
@@ -40,8 +40,4 @@ async function testSetup() {
   }
 }
 
-if (require.main === module) {
-  testSetup();
-}
-
-module.exports = testSetup;
+testSetup();
