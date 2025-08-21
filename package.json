@@ -1,0 +1,20 @@
+{
+  "name": "chatbase-backend",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/kaviyakumar23/chatbase-backend#readme",
+  "bugs": {
+    "url": "https://github.com/kaviyakumar23/chatbase-backend/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://kaviyakumar23@github.com/kaviyakumar23/chatbase-backend.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
