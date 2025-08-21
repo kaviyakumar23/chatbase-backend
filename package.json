@@ -1,7 +1,7 @@
 {
   "name": "chatbase-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Production-ready backend with Express, Supabase, Cloudflare R2, Pinecone, and Clerk authentication",
   "homepage": "https://github.com/kaviyakumar23/chatbase-backend#readme",
   "bugs": {
     "url": "https://github.com/kaviyakumar23/chatbase-backend/issues"
@@ -12,9 +12,31 @@
   },
   "license": "ISC",
   "author": "",
-  "type": "commonjs",
+  "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test-setup": "node scripts/test-setup.js",
+    "test-keys": "node scripts/test-api-keys.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "dotenv": "^16.4.5",
+    "@supabase/supabase-js": "^2.39.7",
+    "@aws-sdk/client-s3": "^3.490.0",
+    "@aws-sdk/s3-request-presigner": "^3.490.0",
+    "@pinecone-database/pinecone": "^2.0.1",
+    "@clerk/express": "^0.0.11",
+    "multer": "^1.4.5-lts.1",
+    "express-rate-limit": "^7.1.5",
+    "compression": "^1.7.4",
+    "express-validator": "^7.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
   }
 }
