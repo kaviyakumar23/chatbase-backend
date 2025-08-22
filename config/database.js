@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { prisma } from './prisma.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -13,5 +14,6 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 export {
   supabase,
-  supabaseAdmin
+  supabaseAdmin,
+  prisma
 };

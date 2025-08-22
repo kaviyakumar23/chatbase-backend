@@ -1,0 +1,256 @@
+// Prisma schema file for Chatbase Backend
+// Compatible with Supabase PostgreSQL database
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================
+// USERS
+// =====================
+
+model User {
+  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  clerkUserId  String   @unique @map("clerk_user_id") @db.VarChar(255)
+  email        String   @unique @db.VarChar(255)
+  fullName     String?  @map("full_name") @db.VarChar(255)
+  
+  // Subscription/limits (for MVP)
+  planType     String   @default("free") @map("plan_type") @db.VarChar(50)
+  chatbotLimit Int      @default(1) @map("chatbot_limit")
+  messageLimit Int      @default(1000) @map("message_limit")
+  
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  chatbots      Chatbot[]
+  usageTracking UsageTracking[]
+
+  @@map("users")
+}
+
+// =====================
+// CHATBOTS
+// =====================
+
+model Chatbot {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  slug        String   @db.VarChar(255)
+  description String?  @db.Text
+
+  // Configuration
+  model            String  @default("gpt-3.5-turbo") @db.VarChar(100)
+  temperature      Decimal @default(0.7) @db.Decimal(2, 1)
+  maxTokens        Int     @default(500) @map("max_tokens")
+  systemPrompt     String? @map("system_prompt") @db.Text
+  welcomeMessage   String  @default("Hello! How can I help you today?") @map("welcome_message") @db.Text
+  suggestedQuestions Json   @default("[]") @map("suggested_questions") @db.JsonB
+
+  // Appearance
+  themeColor      String @default("#000000") @map("theme_color") @db.VarChar(7)
+  botAvatarUrl    String? @map("bot_avatar_url") @db.Text
+  chatBubbleStyle Json   @default("{}") @map("chat_bubble_style") @db.JsonB
+
+  // Access
+  publicId       String    @unique @map("public_id") @db.VarChar(255)
+  apiKey         String?   @unique @map("api_key") @db.VarChar(255)
+  isActive       Boolean   @default(true) @map("is_active")
+  allowedDomains String[]  @map("allowed_domains") @db.Text
+
+  // Pinecone namespace
+  vectorNamespace String @unique @map("vector_namespace") @db.VarChar(255)
+
+  // Stats
+  messageCount   Int       @default(0) @map("message_count")
+  lastMessageAt  DateTime? @map("last_message_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dataSources     DataSource[]
+  conversations   Conversation[]
+  analytics       ChatbotAnalytics[]
+  capturedLeads   CapturedLead[]
+
+  @@unique([userId, slug])
+  @@map("chatbots")
+}
+
+// =====================
+// DATA SOURCES
+// =====================
+
+model DataSource {
+  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  chatbotId  String   @map("chatbot_id") @db.Uuid
+  type       String   @db.VarChar(50)  // 'file', 'website', 'text', 'api'
+  name       String   @db.VarChar(255)
+
+  // Source details (varies by type)
+  sourceConfig Json @map("source_config") @db.JsonB
+
+  // Processing status
+  status       String  @default("pending") @db.VarChar(50)  // 'pending', 'processing', 'completed', 'failed'
+  errorMessage String? @map("error_message") @db.Text
+
+  // Metadata
+  fileSizeBytes BigInt? @map("file_size_bytes")
+  charCount     Int?    @map("char_count")
+  chunkCount    Int?    @map("chunk_count")
+
+  // R2 storage reference
+  r2Key String? @map("r2_key") @db.VarChar(500)
+
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  chatbot Chatbot @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+
+  @@map("data_sources")
+}
+
+// =====================
+// CONVERSATIONS & MESSAGES
+// =====================
+
+model Conversation {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  chatbotId String   @map("chatbot_id") @db.Uuid
+
+  // User identification (for visitors)
+  sessionId String  @map("session_id") @db.VarChar(255)
+  userEmail String? @map("user_email") @db.VarChar(255)
+  userName  String? @map("user_name") @db.VarChar(255)
+
+  // Metadata
+  ipAddress String? @map("ip_address") @db.Inet
+  userAgent String? @map("user_agent") @db.Text
+  referrer  String? @db.Text
+
+  startedAt DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(6)
+
+  // Analytics
+  messageCount  Int     @default(0) @map("message_count")
+  feedbackScore Int?    @map("feedback_score")
+  feedbackText  String? @map("feedback_text") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  chatbot       Chatbot        @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+  messages      Message[]
+  capturedLeads CapturedLead[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  role           String   @db.VarChar(20)  // 'user', 'assistant', 'system'
+  content        String   @db.Text
+
+  // For assistant messages
+  tokensUsed  Int?  @map("tokens_used")
+  contextUsed Json? @map("context_used") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// =====================
+// ANALYTICS
+// =====================
+
+model ChatbotAnalytics {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  chatbotId String   @map("chatbot_id") @db.Uuid
+  date      DateTime @db.Date
+
+  // Metrics
+  totalConversations              Int     @default(0) @map("total_conversations")
+  totalMessages                   Int     @default(0) @map("total_messages")
+  uniqueUsers                     Int     @default(0) @map("unique_users")
+  avgMessagesPerConversation      Decimal? @map("avg_messages_per_conversation") @db.Decimal(10, 2)
+  avgConversationDurationSeconds  Int?    @map("avg_conversation_duration_seconds")
+
+  // Feedback
+  positiveFeedbackCount Int @default(0) @map("positive_feedback_count")
+  negativeFeedbackCount Int @default(0) @map("negative_feedback_count")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  chatbot Chatbot @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+
+  @@unique([chatbotId, date])
+  @@map("chatbot_analytics")
+}
+
+model UsageTracking {
+  id     String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId String   @map("user_id") @db.Uuid
+  month  DateTime @db.Date
+
+  // Usage metrics
+  totalMessages    Int    @default(0) @map("total_messages")
+  totalTokens      Int    @default(0) @map("total_tokens")
+  totalDataSources Int    @default(0) @map("total_data_sources")
+  storageBytesUsed BigInt @default(0) @map("storage_bytes_used")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month])
+  @@map("usage_tracking")
+}
+
+// =====================
+// LEAD CAPTURE
+// =====================
+
+model CapturedLead {
+  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  chatbotId      String   @map("chatbot_id") @db.Uuid
+  conversationId String?  @map("conversation_id") @db.Uuid
+
+  // Lead info
+  email   String? @db.VarChar(255)
+  name    String? @db.VarChar(255)
+  phone   String? @db.VarChar(50)
+  company String? @db.VarChar(255)
+
+  // Additional data
+  customFields Json @default("{}") @map("custom_fields") @db.JsonB
+
+  // Source
+  capturedAt DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+  exported   Boolean  @default(false)
+
+  // Relations
+  chatbot      Chatbot       @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@map("captured_leads")
+}

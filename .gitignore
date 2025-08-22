@@ -181,3 +181,5 @@ docker-compose.override.yml
 
 # Local development
 .local/
+
+/generated/prisma

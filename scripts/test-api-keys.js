@@ -73,7 +73,18 @@ class APIKeyTester {
           accessKeyId: config.cloudflare.accessKeyId,
           secretAccessKey: config.cloudflare.secretAccessKey,
         },
+        forcePathStyle: false
       });
+
+      
+(async () => {
+  try {
+    const res = await s3Client.send(new ListBucketsCommand({}));
+    console.log(res);
+  } catch (err) {
+    console.error("❌", err);
+  }
+})();
 
       // Test connection by listing buckets
       const command = new ListBucketsCommand({});
