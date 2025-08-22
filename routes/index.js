@@ -1,14 +1,33 @@
 import express from 'express';
+import authRoutes from './auth.js';
+import agentRoutes from './agents.js';
+import sourceRoutes from './sources.js';
+import chatRoutes from './chat.js';
+import leadsRoutes from './leads.js';
+import deployRoutes from './deploy.js';
+import publicRoutes from './public.js';
+import usageRoutes from './usage.js';
 
 const router = express.Router();
 
+// Health check endpoint
 router.get('/health', (req, res) => {
   res.json({
     success: true,
-    message: 'Server is running',
+    message: 'Chatbase API is running',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    version: '1.0.0'
   });
 });
+
+// API Routes
+router.use('/auth', authRoutes);
+router.use('/agents', agentRoutes);
+router.use('/agents', sourceRoutes);  // Source routes use /agents/:agentId prefix
+router.use('/agents', chatRoutes);    // Chat routes use /agents/:agentId prefix
+router.use('/agents', leadsRoutes);   // Leads routes use /agents/:agentId prefix
+router.use('/agents', deployRoutes);  // Deploy routes use /agents/:agentId prefix
+router.use('/public', publicRoutes);
+router.use('/usage', usageRoutes);
 
 export default router;

@@ -23,24 +23,24 @@ model User {
   
   // Subscription/limits (for MVP)
   planType     String   @default("free") @map("plan_type") @db.VarChar(50)
-  chatbotLimit Int      @default(1) @map("chatbot_limit")
+  agentLimit   Int      @default(1) @map("agent_limit")
   messageLimit Int      @default(1000) @map("message_limit")
   
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  chatbots      Chatbot[]
+  agents        Agent[]
   usageTracking UsageTracking[]
 
   @@map("users")
 }
 
 // =====================
-// CHATBOTS
+// AGENTS (CHATBOTS)
 // =====================
 
-model Chatbot {
+model Agent {
   id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   userId      String   @map("user_id") @db.Uuid
   name        String   @db.VarChar(255)
@@ -48,19 +48,15 @@ model Chatbot {
   description String?  @db.Text
 
   // Configuration
-  model            String  @default("gpt-3.5-turbo") @db.VarChar(100)
+  model            String  @default("gpt-4o-mini") @db.VarChar(100)
   temperature      Decimal @default(0.7) @db.Decimal(2, 1)
   maxTokens        Int     @default(500) @map("max_tokens")
   systemPrompt     String? @map("system_prompt") @db.Text
-  welcomeMessage   String  @default("Hello! How can I help you today?") @map("welcome_message") @db.Text
-  suggestedQuestions Json   @default("[]") @map("suggested_questions") @db.JsonB
 
-  // Appearance
-  themeColor      String @default("#000000") @map("theme_color") @db.VarChar(7)
-  botAvatarUrl    String? @map("bot_avatar_url") @db.Text
-  chatBubbleStyle Json   @default("{}") @map("chat_bubble_style") @db.JsonB
+  // Status
+  status         String  @default("draft") @db.VarChar(50)  // 'draft', 'published'
 
-  // Access
+  // Public access
   publicId       String    @unique @map("public_id") @db.VarChar(255)
   apiKey         String?   @unique @map("api_key") @db.VarChar(255)
   isActive       Boolean   @default(true) @map("is_active")
@@ -69,8 +65,12 @@ model Chatbot {
   // Pinecone namespace
   vectorNamespace String @unique @map("vector_namespace") @db.VarChar(255)
 
+  // Deploy settings
+  deploySettings  Json    @default("{}") @map("deploy_settings") @db.JsonB
+
   // Stats
   messageCount   Int       @default(0) @map("message_count")
+  sourcesCount   Int       @default(0) @map("sources_count")
   lastMessageAt  DateTime? @map("last_message_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -80,11 +80,11 @@ model Chatbot {
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   dataSources     DataSource[]
   conversations   Conversation[]
-  analytics       ChatbotAnalytics[]
+  analytics       AgentAnalytics[]
   capturedLeads   CapturedLead[]
 
   @@unique([userId, slug])
-  @@map("chatbots")
+  @@map("agents")
 }
 
 // =====================
@@ -92,10 +92,10 @@ model Chatbot {
 // =====================
 
 model DataSource {
-  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  chatbotId  String   @map("chatbot_id") @db.Uuid
-  type       String   @db.VarChar(50)  // 'file', 'website', 'text', 'api'
-  name       String   @db.VarChar(255)
+  id      String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  agentId String   @map("agent_id") @db.Uuid
+  type    String   @db.VarChar(50)  // 'file', 'website', 'text'
+  name    String   @db.VarChar(255)
 
   // Source details (varies by type)
   sourceConfig Json @map("source_config") @db.JsonB
@@ -117,7 +117,7 @@ model DataSource {
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  chatbot Chatbot @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@map("data_sources")
 }
@@ -127,8 +127,8 @@ model DataSource {
 // =====================
 
 model Conversation {
-  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  chatbotId String   @map("chatbot_id") @db.Uuid
+  id      String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  agentId String   @map("agent_id") @db.Uuid
 
   // User identification (for visitors)
   sessionId String  @map("session_id") @db.VarChar(255)
@@ -151,7 +151,7 @@ model Conversation {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   // Relations
-  chatbot       Chatbot        @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+  agent         Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
   messages      Message[]
   capturedLeads CapturedLead[]
 
@@ -180,10 +180,10 @@ model Message {
 // ANALYTICS
 // =====================
 
-model ChatbotAnalytics {
-  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  chatbotId String   @map("chatbot_id") @db.Uuid
-  date      DateTime @db.Date
+model AgentAnalytics {
+  id      String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  agentId String   @map("agent_id") @db.Uuid
+  date    DateTime @db.Date
 
   // Metrics
   totalConversations              Int     @default(0) @map("total_conversations")
@@ -199,10 +199,10 @@ model ChatbotAnalytics {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   // Relations
-  chatbot Chatbot @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
-  @@unique([chatbotId, date])
-  @@map("chatbot_analytics")
+  @@unique([agentId, date])
+  @@map("agent_analytics")
 }
 
 model UsageTracking {
@@ -232,7 +232,7 @@ model UsageTracking {
 
 model CapturedLead {
   id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  chatbotId      String   @map("chatbot_id") @db.Uuid
+  agentId        String   @map("agent_id") @db.Uuid
   conversationId String?  @map("conversation_id") @db.Uuid
 
   // Lead info
@@ -242,14 +242,15 @@ model CapturedLead {
   company String? @db.VarChar(255)
 
   // Additional data
-  customFields Json @default("{}") @map("custom_fields") @db.JsonB
+  metadata Json @default("{}") @map("metadata") @db.JsonB
 
   // Source
+  sessionId  String   @map("session_id") @db.VarChar(255)
   capturedAt DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
   exported   Boolean  @default(false)
 
   // Relations
-  chatbot      Chatbot       @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+  agent        Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
   conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   @@map("captured_leads")
