@@ -38,10 +38,11 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
+// Apply Clerk middleware early in the chain, before routes
+app.use(clerkMiddleware());
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-app.use(clerkMiddleware());
 
 app.use('/api/v1', routes);
 
