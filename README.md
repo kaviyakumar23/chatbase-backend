@@ -1,464 +1,329 @@
 # Chatbase Backend API
 
-A production-ready backend API for a chatbase/chatbot platform built with Express.js, Prisma, Supabase, Cloudflare R2, and Pinecone.
+Backend API for a chatbase/chatbot platform built with Express.js, Prisma, Supabase, Cloudflare R2, and Pinecone.
 
-## 🚀 Features
-
-### Complete API Implementation
-- **27 API endpoints** covering all major functionality
-- **Authentication** with Clerk webhooks and user management
-- **Agent Management** with full CRUD operations
-- **Source Management** supporting files, websites, and text
-- **Chat/Conversation** handling with session management
-- **Lead Capture** and export functionality
-- **Deploy Settings** and integration management
-- **Public Widget APIs** for external usage
-- **Usage/Billing** tracking and analytics
-
-### Tech Stack
-- **Framework**: Express.js with ES6 modules
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: Clerk
-- **File Storage**: Cloudflare R2
-- **Vector Database**: Pinecone
-- **Validation**: express-validator
-- **Security**: Helmet, CORS, Rate limiting
-
-## 📋 API Endpoints
-
-### Authentication APIs
-- `POST /api/v1/auth/webhook` - Clerk webhook handler
-- `GET /api/v1/auth/me` - Get current user info
-
-### Agent Management APIs
-- `GET /api/v1/agents` - List all agents
-- `POST /api/v1/agents` - Create new agent
-- `GET /api/v1/agents/:id` - Get agent details
-- `PUT /api/v1/agents/:id` - Update agent
-- `DELETE /api/v1/agents/:id` - Delete agent
-
-### Source Management APIs
-- `GET /api/v1/agents/:agentId/sources` - List agent sources
-- `POST /api/v1/agents/:agentId/sources/file` - Upload file source
-- `POST /api/v1/agents/:agentId/sources/website` - Add website source
-- `POST /api/v1/agents/:agentId/sources/text` - Add text source
-- `DELETE /api/v1/agents/:agentId/sources/:sourceId` - Delete source
-- `POST /api/v1/agents/:agentId/sources/:sourceId/reprocess` - Reprocess source
-
-### Chat/Conversation APIs
-- `POST /api/v1/agents/:agentId/chat` - Send message to agent
-- `GET /api/v1/agents/:agentId/chat-logs` - Get chat logs
-- `GET /api/v1/agents/:agentId/chat-logs/:sessionId` - Get specific session
-
-### Lead Management APIs
-- `GET /api/v1/agents/:agentId/leads` - List captured leads
-- `PUT /api/v1/agents/:agentId/leads/:leadId` - Update lead status
-- `POST /api/v1/agents/:agentId/leads/export` - Export leads to CSV
-
-### Deploy/Integration APIs
-- `GET /api/v1/agents/:agentId/deploy-settings` - Get widget settings
-- `PUT /api/v1/agents/:agentId/deploy-settings` - Update widget settings
-- `GET /api/v1/agents/:agentId/integrations` - Get integration info
-- `PUT /api/v1/agents/:agentId/integrations` - Update integrations
-
-### Public Widget APIs (No auth required)
-- `GET /api/v1/public/agents/:publicId/config` - Get public agent config
-- `POST /api/v1/public/agents/:publicId/chat` - Send message via widget
-- `POST /api/v1/public/agents/:publicId/lead` - Capture lead via widget
-
-### Usage/Billing APIs
-- `GET /api/v1/usage` - Get usage statistics and billing info
-
-## 🛠 Setup
 
 ### Prerequisites
-- Node.js 18+
-- PostgreSQL database (Supabase recommended)
-- Clerk account for authentication
-- Cloudflare R2 for file storage
-- Pinecone for vector storage
+- Node.js 18+ installed
+- Git installed
+- A code editor (VS Code recommended)
+- ngrok (for webhook testing)
 
-### Quick Start (New Users)
+## 📋 Step-by-Step Setup
 
-For the fastest setup with local development:
+### 1. Clone and Install Dependencies
 
 ```bash
-# 1. Clone and install
+# Clone the repository
 git clone <repository-url>
 cd chatbase-backend
-npm install
 
-# 2. Install Supabase CLI
+# Install dependencies
+npm install
+```
+
+### 2. Install Required Tools
+
+```bash
+# Install Supabase CLI globally
 npm install -g supabase
 
-# 3. Setup local database
+# Verify Supabase installation
+supabase --version
+
+# Install ngrok for webhook testing (if not already installed)
+# Option 1: Using npm
+npm install -g ngrok
+
+# Option 2: Using Homebrew (macOS)
+brew install ngrok
+
+# Option 3: Download from https://ngrok.com/download
+
+# Verify ngrok installation
+ngrok version
+```
+
+### 3. Start Local Supabase Database
+
+```bash
+# Start local Supabase instance
 supabase start
+
+# This will output something like:
+# API URL: http://127.0.0.1:54321
+# DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+# Studio URL: http://127.0.0.1:54323
+# Inbucket URL: http://127.0.0.1:54324
+# JWT secret: super-secret-jwt-token-with-at-least-32-characters-long
+# anon key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# service_role key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Important**: Keep this terminal open - your local Supabase instance needs to stay running.
+
+### 4. Apply Database Migrations
+
+```bash
+# Apply all database migrations to your local database
 supabase db reset
 
-# 4. Setup Prisma
+# This will create all the necessary tables and schema
+```
+
+### 5. Setup Prisma
+
+```bash
+# Pull the database schema into Prisma
 npx prisma db pull
+
+# Generate the Prisma client
 npx prisma generate
 
-# 5. Configure environment (copy .env.example to .env and fill in your keys)
-cp .env.example .env
-
-# 6. Start development server
-npm run dev
+# (Optional) Open Prisma Studio to view your database
+npx prisma studio
 ```
 
-Your API will be running at `http://localhost:3000` with a local Supabase database.
+### 6. Environment Configuration
 
-### Detailed Installation
+Create a `.env` file in the root directory:
 
-1. **Clone and install dependencies**
 ```bash
-git clone <repository-url>
-cd chatbase-backend
-npm install
+# Copy the example environment file
+cp .env.example .env
 ```
 
-2. **Environment Configuration**
-Copy `.env.example` to `.env` and configure:
+Now edit the `.env` file with your configuration:
 
 ```env
-# Server Configuration
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
 NODE_ENV=development
 PORT=3000
 
-# Database Configuration (Supabase)
-# For local: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-# For remote: postgresql://postgres:[password]@[host]:[port]/postgres
-DATABASE_URL=your_postgresql_connection_string
+# =============================================================================
+# DATABASE CONFIGURATION (Local Supabase)
+# =============================================================================
+# Use the local Supabase database URL from step 3
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
-# Supabase Configuration
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_KEY=your_supabase_service_key
+# =============================================================================
+# SUPABASE CONFIGURATION (Local)
+# =============================================================================
+# Use the URLs from step 3
+SUPABASE_URL="http://127.0.0.1:54321"
+SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." # From step 3
+SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." # From step 3
 
-# Clerk Authentication
-CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-CLERK_SECRET_KEY=your_clerk_secret_key
-CLERK_WEBHOOK_SECRET=your_clerk_webhook_signing_secret
+# =============================================================================
+# CLERK AUTHENTICATION (Required for production)
+# =============================================================================
+# Get these from https://dashboard.clerk.com/
+CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key
+CLERK_SECRET_KEY=sk_test_your_clerk_secret_key
+CLERK_WEBHOOK_SECRET=whsec_your_webhook_signing_secret
 
-# Cloudflare R2 Storage
+# =============================================================================
+# CLOUDFLARE R2 STORAGE (Required for file uploads)
+# =============================================================================
+# Get these from https://dash.cloudflare.com/
 CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
 CLOUDFLARE_ACCESS_KEY_ID=your_cloudflare_access_key_id
 CLOUDFLARE_SECRET_ACCESS_KEY=your_cloudflare_secret_access_key
 CLOUDFLARE_R2_BUCKET_NAME=your_bucket_name
-CLOUDFLARE_R2_ENDPOINT=your_r2_endpoint
+CLOUDFLARE_R2_ENDPOINT=https://your_account_id.r2.cloudflarestorage.com
 
-# Pinecone Vector Database
+# =============================================================================
+# PINECONE VECTOR DATABASE (Required for AI search)
+# =============================================================================
+# Get these from https://app.pinecone.io/
 PINECONE_API_KEY=your_pinecone_api_key
 PINECONE_INDEX_NAME=your_pinecone_index_name
 
-# URLs for widget and sharing
-BASE_URL=https://api.yourapp.com
-WIDGET_URL=https://widget.yourapp.com
-SHARE_URL=https://chat.yourapp.com
+# =============================================================================
+# APPLICATION URLs (Update for your domain)
+# =============================================================================
+BASE_URL=http://localhost:3000
+WIDGET_URL=http://localhost:3000
+SHARE_URL=http://localhost:3000
 ```
 
-3. **Database Setup**
+### 7. Setup ngrok for Webhook Testing
 
-This project uses **Supabase** for the database with **Prisma** as the ORM. You have two options:
-
-### Option A: Local Development with Supabase CLI (Recommended)
+Since Clerk webhooks require HTTPS, we need to use ngrok to expose our local server:
 
 ```bash
-# Install Supabase CLI (if not already installed)
-npm install -g supabase
+# Start your development server first (in one terminal)
+npm run dev
 
-# Start local Supabase instance
-supabase start
+# In another terminal, start ngrok to expose your local server
+ngrok http 3000
 
-# Apply database migrations
-supabase db reset
-
-# Generate Prisma client from existing database
-npx prisma db pull
-npx prisma generate
-
-# (Optional) View database in Prisma Studio
-npx prisma studio
+# This will output something like:
+# Forwarding    https://abc123.ngrok.io -> http://localhost:3000
+# Forwarding    https://def456.ngrok.io -> http://localhost:3000
 ```
 
-**Note**: Local Supabase will run on:
-- API: `http://127.0.0.1:54321`
-- Database: `postgresql://postgres:postgres@127.0.0.1:54322/postgres`
-- Studio: `http://127.0.0.1:54323`
+**Important**: Keep both terminals open - your server and ngrok need to stay running.
 
-### Option B: Remote Supabase Database
+### 8. Get Required API Keys
+
+#### Clerk Authentication (Required)
+1. Go to [Clerk Dashboard](https://dashboard.clerk.com/)
+2. Create a new application
+3. Go to **API Keys** in the sidebar
+4. Copy the **Publishable Key** and **Secret Key**
+5. Go to **Webhooks** → **Add Endpoint**
+   - URL: `https://your-ngrok-url.ngrok.io/api/v1/auth/webhook` (use the HTTPS URL from ngrok)
+   - Events: Select `user.created`, `user.updated`, `user.deleted`
+6. Copy the **Signing Secret** (starts with `whsec_`)
+
+#### Cloudflare R2 Storage (Required for file uploads)
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
+2. Navigate to **R2 Object Storage**
+3. Create a new bucket
+4. Go to **Manage R2 API tokens**
+5. Create a new API token with R2 permissions
+6. Copy the **Account ID**, **Access Key ID**, and **Secret Access Key**
+7. Note your **Bucket Name** and **Endpoint URL**
+
+#### Pinecone Vector Database (Required for AI search)
+1. Go to [Pinecone Console](https://app.pinecone.io/)
+2. Create a new project
+3. Create a new index (dimension: 1536, metric: cosine)
+4. Copy the **API Key** and **Index Name**
+
+### 9. Test Your Setup
 
 ```bash
-# 1. Create a new project at https://supabase.com/dashboard
-# 2. Go to Settings → Database and copy your connection string
-# 3. Update your .env file with the remote DATABASE_URL:
-#    DATABASE_URL="postgresql://postgres:[password]@[host]:[port]/postgres"
+# Test basic setup
+npm run test-setup
 
-# 4. Apply migrations to remote database
-supabase migration up --db-url "your_remote_database_url"
+# Test API keys
+npm run test-keys
 
-# 5. Generate Prisma client
-npx prisma db pull
-npx prisma generate
+# Test database connection
+npm run test-prisma
 ```
 
-### Important Notes:
-- **DO NOT** run `prisma migrate dev` - we use Supabase migrations instead
-- The database schema is managed via Supabase migrations in `supabase/migrations/`
-- Always use `prisma db pull` after schema changes to sync Prisma with the database
-- Use `prisma generate` to regenerate the type-safe client after schema changes
+### 10. Start the Development Server
 
-4. **Webhook Setup (Production)**
-
-For production deployments, you need to configure Clerk webhooks:
-
-### Clerk Webhook Configuration
-
-1. **Get your webhook signing secret**:
-   - Go to [Clerk Dashboard](https://dashboard.clerk.com/)
-   - Navigate to your application → **Webhooks**
-   - Click **Add Endpoint**
-   - Set the endpoint URL: `https://your-domain.com/api/v1/auth/webhook`
-   - Select events: `user.created`, `user.updated`, `user.deleted`
-   - Copy the **Signing Secret**
-
-2. **Add to environment variables**:
-   ```env
-   CLERK_WEBHOOK_SECRET=whsec_your_signing_secret_here
-   ```
-
-3. **Security features**:
-   - ✅ **Signature verification**: All webhooks are cryptographically verified
-   - ✅ **Timestamp validation**: Prevents replay attacks
-   - ✅ **Header validation**: Ensures proper Svix headers are present
-   - ✅ **Error handling**: Comprehensive logging and error responses
-
-**Important**: Never skip webhook signature verification in production. The signing secret ensures that webhooks are actually coming from Clerk and haven't been tampered with.
-
-5. **Start Development Server**
 ```bash
+# Start the development server
 npm run dev
 ```
 
-## 🧪 Testing
+Your API will be running at `http://localhost:3000` and accessible via ngrok at `https://your-ngrok-url.ngrok.io`
 
-### Health Check
+### 11. Verify Everything Works
+
 ```bash
+# Test the health endpoint
 curl http://localhost:3000/api/v1/health
+
+# Should return: {"status":"ok","message":"Chatbase API is running"}
 ```
 
-### Comprehensive Testing
-See `test-apis.md` for detailed curl examples for all 27 endpoints.
+## 🔧 Development Workflow
 
-### Test Scripts
+### Database Changes
+When you need to modify the database schema:
+
 ```bash
-npm run test-setup    # Test basic setup
-npm run test-keys     # Test API keys
-npm run test-prisma   # Test database connection
+# 1. Create a new migration
+supabase migration new your_migration_name
+
+# 2. Edit the generated SQL file in supabase/migrations/
+
+# 3. Apply the migration
+supabase db reset
+
+# 4. Update Prisma schema
+npx prisma db pull
+npx prisma generate
 ```
 
-## 🔧 Database Troubleshooting
+### Viewing Your Database
+```bash
+# Open Prisma Studio (web interface)
+npx prisma studio
 
-### Common Issues and Solutions
+# Or use Supabase Studio
+# Open http://127.0.0.1:54323 in your browser
+```
 
-#### Error: "Cannot fetch data from service: fetch failed"
-**Cause**: Wrong DATABASE_URL format or connection issue
+### Stopping Local Services
+```bash
+# Stop local Supabase
+supabase stop
 
-**Solutions**:
-1. **For Local Development**: Ensure DATABASE_URL uses local Supabase format:
-   ```env
-   DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-   ```
+# Stop ngrok (Ctrl+C in the ngrok terminal)
 
-2. **For Remote Supabase**: Use the correct PostgreSQL connection string (not prisma+postgres://)
-   ```env
-   DATABASE_URL="postgresql://postgres:[password]@[host]:[port]/postgres"
-   ```
+# To start again later
+supabase start
+ngrok http 3000
+```
 
-3. **Check Supabase Status**:
-   ```bash
-   supabase status  # For local
-   ```
+## 🚨 Common Issues & Solutions
 
-#### Error: "The introspected database was empty"
+### "Cannot fetch data from service: fetch failed"
+**Cause**: Wrong DATABASE_URL format
+
+**Solution**: Ensure your DATABASE_URL uses the local Supabase format:
+```env
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+```
+
+### "The introspected database was empty"
 **Cause**: Database migrations haven't been applied
 
 **Solution**:
 ```bash
-# For local Supabase
 supabase db reset
-
-# For remote Supabase
-supabase migration up --db-url "your_database_url"
+npx prisma db pull
+npx prisma generate
 ```
 
-#### Error: "Migration asking for name"
-**Cause**: You're trying to use Prisma migrations instead of Supabase migrations
+### "Migration asking for name"
+**Cause**: Trying to use Prisma migrations instead of Supabase migrations
+
+**Solution**: Cancel (Ctrl+C) and use Supabase migrations:
+```bash
+supabase db reset
+npx prisma db pull
+npx prisma generate
+```
+
+### "Webhook signature verification failed"
+**Cause**: Missing or incorrect CLERK_WEBHOOK_SECRET
 
 **Solution**:
-1. **Cancel the migration** (Ctrl+C)
-2. **Use Supabase migrations instead**:
-   ```bash
-   supabase db reset
-   npx prisma db pull
-   npx prisma generate
-   ```
+1. Get the correct secret from Clerk Dashboard → Webhooks
+2. Ensure it starts with `whsec_`
+3. Restart your server after updating .env
 
-#### Schema Out of Sync
-**Cause**: Database schema changed but Prisma client not updated
-
+### Supabase CLI not found
 **Solution**:
 ```bash
-npx prisma db pull    # Sync schema from database
-npx prisma generate   # Regenerate Prisma client
+npm install -g supabase
+# Or if you have issues with global install:
+npx supabase start
 ```
 
-#### Webhook Signature Verification Failed
-**Cause**: Missing or incorrect `CLERK_WEBHOOK_SECRET`
-
-**Solutions**:
-1. **Check environment variable**:
-   ```bash
-   echo $CLERK_WEBHOOK_SECRET  # Should start with "whsec_"
-   ```
-
-2. **Get the correct secret**:
-   - Go to Clerk Dashboard → Webhooks
-   - Copy the signing secret from your webhook endpoint
-   - Ensure it starts with `whsec_`
-
-3. **Restart your server** after updating the environment variable
-
-#### Webhook Missing Headers
-**Cause**: Request not coming from Clerk or missing Svix headers
-
-**Solution**: Ensure your webhook endpoint URL in Clerk Dashboard is correct and the request includes these headers:
-- `svix-id`
-- `svix-timestamp` 
-- `svix-signature`
-
-## 📁 Project Structure
-
-```
-chatbase-backend/
-├── controllers/          # API logic
-│   ├── authController.js
-│   ├── agentController.js
-│   ├── sourceController.js
-│   ├── chatController.js
-│   ├── leadsController.js
-│   ├── deployController.js
-│   ├── publicController.js
-│   └── usageController.js
-├── routes/              # Route definitions
-│   ├── auth.js
-│   ├── agents.js
-│   ├── sources.js
-│   ├── chat.js
-│   ├── leads.js
-│   ├── deploy.js
-│   ├── public.js
-│   ├── usage.js
-│   └── index.js
-├── middleware/          # Custom middleware
-│   ├── auth.js         # Authentication
-│   ├── validation.js   # Input validation
-│   └── errorHandler.js # Error handling
-├── services/           # External service integrations
-│   ├── storageService.js   # Cloudflare R2
-│   ├── vectorService.js    # Pinecone
-│   ├── prismaService.js    # Database
-│   └── supabaseService.js  # Supabase
-├── config/             # Configuration files
-├── prisma/            # Database schema and migrations
-├── utils/             # Utility functions
-└── generated/         # Generated Prisma client
-```
-
-## 🔒 Security Features
-
-- **Authentication**: Clerk JWT token validation
-- **Rate Limiting**: Configurable rate limits for public endpoints
-- **Input Validation**: Comprehensive validation for all endpoints
-- **CORS**: Configurable CORS policies
-- **Helmet**: Security headers
-- **Domain Restrictions**: Configurable allowed domains for widgets
-
-## 🔄 Data Flow
-
-### Agent Creation Flow
-1. User creates agent via API
-2. Unique identifiers generated (slug, publicId, vectorNamespace)
-3. Default deploy settings created
-4. Agent stored in database
-
-### Source Processing Flow
-1. File uploaded to Cloudflare R2
-2. Source record created in database
-3. Background job processes content (TODO: implement)
-4. Text extracted, chunked, and embedded
-5. Vectors stored in Pinecone with metadata
-
-### Chat Flow
-1. Message received via public or authenticated endpoint
-2. Vector search for relevant context
-3. LLM generates response with context
-4. Message and response stored in database
-5. Usage statistics updated
-
-## 📊 Database Schema
-
-### Key Models
-- **User**: Clerk user with plan limits
-- **Agent**: Chatbot configuration and settings
-- **DataSource**: File, website, or text sources
-- **Conversation**: Chat sessions with metadata
-- **Message**: Individual messages in conversations
-- **CapturedLead**: Lead information from conversations
-- **UsageTracking**: Monthly usage statistics
-
-## 🚢 Production Deployment
-
-### Environment Variables
-Set all required environment variables for production services.
-
-### Database Migrations
+### ngrok not found
+**Solution**:
 ```bash
-npx prisma migrate deploy
+# Install ngrok
+npm install -g ngrok
+# Or download from https://ngrok.com/download
 ```
 
-### Process Management
-Use PM2, Docker, or similar for process management in production.
+### Webhook not receiving events
+**Cause**: Wrong ngrok URL or ngrok not running
 
-### Monitoring
-- Health check endpoint: `/api/v1/health`
-- Usage tracking built-in
-- Error logging with Winston
-
-## 📚 API Documentation
-
-- **OpenAPI/Swagger**: Coming soon
-- **Postman Collection**: Available on request
-- **Testing Guide**: See `test-apis.md`
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Add tests for new functionality
-4. Submit pull request
-
-## 📄 License
-
-ISC License - see LICENSE file for details.
-
-## 🆘 Support
-
-- Check `test-apis.md` for API examples
-- Review environment configuration
-- Ensure all external services are properly configured
-- Check logs for detailed error information
-
----
-
-**Note**: This is a complete API implementation with 27 endpoints covering all major chatbase functionality. The chat AI responses currently return placeholder content - integrate with OpenAI API for actual AI responses.
+**Solution**:
+1. Ensure ngrok is running: `ngrok http 3000`
+2. Copy the HTTPS URL from ngrok output
+3. Update webhook URL in Clerk Dashboard with the new ngrok URL
+4. Test webhook delivery in Clerk Dashboard
