@@ -1,9 +1,8 @@
-import { PrismaClient } from '../generated/prisma/index.js';
+import { prisma } from '../config/prisma.js';
 import { createSuccessResponse, createErrorResponse } from '../utils/response.js';
 import logger from '../utils/logger.js';
 import { nanoid } from 'nanoid';
-
-const prisma = new PrismaClient();
+import { convertPrismaToApiResponse } from '../utils/caseConverter.js';
 
 // GET /api/agents/:agentId/deploy-settings
 export const getDeploySettings = async (req, res) => {
@@ -26,16 +25,16 @@ export const getDeploySettings = async (req, res) => {
     const settings = agent.deploySettings || {};
 
     const response = {
-      initial_message: settings.initial_message || "Hi! What can I help you with?",
-      suggested_messages: settings.suggested_messages || [],
-      message_placeholder: settings.message_placeholder || "Type your message...",
+      initialMessage: settings.initial_message || "Hi! What can I help you with?",
+      suggestedMessages: settings.suggested_messages || [],
+      messagePlaceholder: settings.message_placeholder || "Type your message...",
       theme: settings.theme || "light",
-      bubble_color: settings.bubble_color || "#000000",
-      bubble_position: settings.bubble_position || "bottom-right",
-      display_name: settings.display_name || "",
-      profile_picture_url: settings.profile_picture_url || null,
-      collect_user_info: settings.collect_user_info || false,
-      show_sources: settings.show_sources !== false // Default to true
+      bubbleColor: settings.bubble_color || "#000000",
+      bubblePosition: settings.bubble_position || "bottom-right",
+      displayName: settings.display_name || "",
+      profilePictureUrl: settings.profile_picture_url || null,
+      collectUserInfo: settings.collect_user_info || false,
+      showSources: settings.show_sources !== false // Default to true
     };
 
     res.json(createSuccessResponse(response));
@@ -97,7 +96,7 @@ export const updateDeploySettings = async (req, res) => {
 
     res.json(createSuccessResponse({
       success: true,
-      updated_at: new Date()
+      updatedAt: new Date()
     }));
   } catch (error) {
     logger.error('Update deploy settings error:', error);

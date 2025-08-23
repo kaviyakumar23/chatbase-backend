@@ -78,7 +78,37 @@ A production-ready backend API for a chatbase/chatbot platform built with Expres
 - Cloudflare R2 for file storage
 - Pinecone for vector storage
 
-### Installation
+### Quick Start (New Users)
+
+For the fastest setup with local development:
+
+```bash
+# 1. Clone and install
+git clone <repository-url>
+cd chatbase-backend
+npm install
+
+# 2. Install Supabase CLI
+npm install -g supabase
+
+# 3. Setup local database
+supabase start
+supabase db reset
+
+# 4. Setup Prisma
+npx prisma db pull
+npx prisma generate
+
+# 5. Configure environment (copy .env.example to .env and fill in your keys)
+cp .env.example .env
+
+# 6. Start development server
+npm run dev
+```
+
+Your API will be running at `http://localhost:3000` with a local Supabase database.
+
+### Detailed Installation
 
 1. **Clone and install dependencies**
 ```bash
@@ -96,6 +126,8 @@ NODE_ENV=development
 PORT=3000
 
 # Database Configuration (Supabase)
+# For local: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+# For remote: postgresql://postgres:[password]@[host]:[port]/postgres
 DATABASE_URL=your_postgresql_connection_string
 
 # Supabase Configuration
@@ -106,6 +138,7 @@ SUPABASE_SERVICE_KEY=your_supabase_service_key
 # Clerk Authentication
 CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
 CLERK_SECRET_KEY=your_clerk_secret_key
+CLERK_WEBHOOK_SECRET=your_clerk_webhook_signing_secret
 
 # Cloudflare R2 Storage
 CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
@@ -125,18 +158,84 @@ SHARE_URL=https://chat.yourapp.com
 ```
 
 3. **Database Setup**
-```bash
-# Generate Prisma client
-npx prisma generate
 
-# Run database migrations
-npx prisma migrate dev
+This project uses **Supabase** for the database with **Prisma** as the ORM. You have two options:
+
+### Option A: Local Development with Supabase CLI (Recommended)
+
+```bash
+# Install Supabase CLI (if not already installed)
+npm install -g supabase
+
+# Start local Supabase instance
+supabase start
+
+# Apply database migrations
+supabase db reset
+
+# Generate Prisma client from existing database
+npx prisma db pull
+npx prisma generate
 
 # (Optional) View database in Prisma Studio
 npx prisma studio
 ```
 
-4. **Start Development Server**
+**Note**: Local Supabase will run on:
+- API: `http://127.0.0.1:54321`
+- Database: `postgresql://postgres:postgres@127.0.0.1:54322/postgres`
+- Studio: `http://127.0.0.1:54323`
+
+### Option B: Remote Supabase Database
+
+```bash
+# 1. Create a new project at https://supabase.com/dashboard
+# 2. Go to Settings → Database and copy your connection string
+# 3. Update your .env file with the remote DATABASE_URL:
+#    DATABASE_URL="postgresql://postgres:[password]@[host]:[port]/postgres"
+
+# 4. Apply migrations to remote database
+supabase migration up --db-url "your_remote_database_url"
+
+# 5. Generate Prisma client
+npx prisma db pull
+npx prisma generate
+```
+
+### Important Notes:
+- **DO NOT** run `prisma migrate dev` - we use Supabase migrations instead
+- The database schema is managed via Supabase migrations in `supabase/migrations/`
+- Always use `prisma db pull` after schema changes to sync Prisma with the database
+- Use `prisma generate` to regenerate the type-safe client after schema changes
+
+4. **Webhook Setup (Production)**
+
+For production deployments, you need to configure Clerk webhooks:
+
+### Clerk Webhook Configuration
+
+1. **Get your webhook signing secret**:
+   - Go to [Clerk Dashboard](https://dashboard.clerk.com/)
+   - Navigate to your application → **Webhooks**
+   - Click **Add Endpoint**
+   - Set the endpoint URL: `https://your-domain.com/api/v1/auth/webhook`
+   - Select events: `user.created`, `user.updated`, `user.deleted`
+   - Copy the **Signing Secret**
+
+2. **Add to environment variables**:
+   ```env
+   CLERK_WEBHOOK_SECRET=whsec_your_signing_secret_here
+   ```
+
+3. **Security features**:
+   - ✅ **Signature verification**: All webhooks are cryptographically verified
+   - ✅ **Timestamp validation**: Prevents replay attacks
+   - ✅ **Header validation**: Ensures proper Svix headers are present
+   - ✅ **Error handling**: Comprehensive logging and error responses
+
+**Important**: Never skip webhook signature verification in production. The signing secret ensures that webhooks are actually coming from Clerk and haven't been tampered with.
+
+5. **Start Development Server**
 ```bash
 npm run dev
 ```
@@ -157,6 +256,86 @@ npm run test-setup    # Test basic setup
 npm run test-keys     # Test API keys
 npm run test-prisma   # Test database connection
 ```
+
+## 🔧 Database Troubleshooting
+
+### Common Issues and Solutions
+
+#### Error: "Cannot fetch data from service: fetch failed"
+**Cause**: Wrong DATABASE_URL format or connection issue
+
+**Solutions**:
+1. **For Local Development**: Ensure DATABASE_URL uses local Supabase format:
+   ```env
+   DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+   ```
+
+2. **For Remote Supabase**: Use the correct PostgreSQL connection string (not prisma+postgres://)
+   ```env
+   DATABASE_URL="postgresql://postgres:[password]@[host]:[port]/postgres"
+   ```
+
+3. **Check Supabase Status**:
+   ```bash
+   supabase status  # For local
+   ```
+
+#### Error: "The introspected database was empty"
+**Cause**: Database migrations haven't been applied
+
+**Solution**:
+```bash
+# For local Supabase
+supabase db reset
+
+# For remote Supabase
+supabase migration up --db-url "your_database_url"
+```
+
+#### Error: "Migration asking for name"
+**Cause**: You're trying to use Prisma migrations instead of Supabase migrations
+
+**Solution**:
+1. **Cancel the migration** (Ctrl+C)
+2. **Use Supabase migrations instead**:
+   ```bash
+   supabase db reset
+   npx prisma db pull
+   npx prisma generate
+   ```
+
+#### Schema Out of Sync
+**Cause**: Database schema changed but Prisma client not updated
+
+**Solution**:
+```bash
+npx prisma db pull    # Sync schema from database
+npx prisma generate   # Regenerate Prisma client
+```
+
+#### Webhook Signature Verification Failed
+**Cause**: Missing or incorrect `CLERK_WEBHOOK_SECRET`
+
+**Solutions**:
+1. **Check environment variable**:
+   ```bash
+   echo $CLERK_WEBHOOK_SECRET  # Should start with "whsec_"
+   ```
+
+2. **Get the correct secret**:
+   - Go to Clerk Dashboard → Webhooks
+   - Copy the signing secret from your webhook endpoint
+   - Ensure it starts with `whsec_`
+
+3. **Restart your server** after updating the environment variable
+
+#### Webhook Missing Headers
+**Cause**: Request not coming from Clerk or missing Svix headers
+
+**Solution**: Ensure your webhook endpoint URL in Clerk Dashboard is correct and the request includes these headers:
+- `svix-id`
+- `svix-timestamp` 
+- `svix-signature`
 
 ## 📁 Project Structure
 

@@ -1,19 +1,9 @@
-import { PrismaClient } from '../generated/prisma/index.js';
+import { prisma } from '../config/prisma.js';
 import { createSuccessResponse, createErrorResponse } from '../utils/response.js';
 import storageService from '../services/storageService.js';
 import vectorService from '../services/vectorService.js';
 import logger from '../utils/logger.js';
-import multer from 'multer';
-
-const prisma = new PrismaClient();
-
-// Configure multer for file uploads
-export const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-});
+import { convertPrismaArrayToApiResponse, convertPrismaToApiResponse } from '../utils/caseConverter.js';
 
 // GET /api/agents/:agentId/sources
 export const getSources = async (req, res) => {
@@ -22,8 +12,8 @@ export const getSources = async (req, res) => {
     const { agentId } = req.params;
 
     // Verify agent ownership
-    const agent = await prisma.agent.findFirst({
-      where: { id: agentId, userId }
+    const agent = await prisma.chatbots.findFirst({
+      where: { id: agentId, user_id: userId }
     });
 
     if (!agent) {
@@ -31,7 +21,7 @@ export const getSources = async (req, res) => {
     }
 
     const sources = await prisma.dataSource.findMany({
-      where: { agentId },
+      where: { chatbot_id: agentId },
       select: {
         id: true,
         type: true,
@@ -45,15 +35,7 @@ export const getSources = async (req, res) => {
     });
 
     const response = {
-      sources: sources.map(source => ({
-        id: source.id,
-        type: source.type,
-        name: source.name,
-        status: source.status,
-        char_count: source.charCount,
-        chunk_count: source.chunkCount,
-        created_at: source.createdAt
-      }))
+      sources: convertPrismaArrayToApiResponse(sources, 'source')
     };
 
     res.json(createSuccessResponse(response));
@@ -68,44 +50,41 @@ export const createFileSource = async (req, res) => {
   try {
     const userId = await getUserIdFromClerkId(req.auth.userId);
     const { agentId } = req.params;
-    const { name } = req.body;
-    const file = req.file;
+    const { name, url, originalName, mimeType, fileSize } = req.body;
 
-    if (!file) {
-      return res.status(400).json(createErrorResponse('No file provided'));
+    if (!url) {
+      return res.status(400).json(createErrorResponse('File URL is required'));
     }
 
     // Verify agent ownership
-    const agent = await prisma.agent.findFirst({
-      where: { id: agentId, userId }
+    const agent = await prisma.chatbots.findFirst({
+      where: { id: agentId, user_id: userId }
     });
 
     if (!agent) {
       return res.status(404).json(createErrorResponse('Agent not found'));
     }
 
-    // Upload file to R2
-    const fileKey = storageService.generateFileKey(userId, file.originalname, 'sources');
-    const uploadResult = await storageService.uploadFile(
-      fileKey,
-      file.buffer,
-      file.mimetype,
-      { agentId, originalName: file.originalname }
-    );
+    // Validate URL format
+    try {
+      new URL(url);
+    } catch {
+      return res.status(400).json(createErrorResponse('Invalid file URL provided'));
+    }
 
     // Create data source record
     const dataSource = await prisma.dataSource.create({
       data: {
-        agentId,
+        chatbot_id: agentId,
         type: 'file',
-        name: name || file.originalname,
+        name: name || originalName || 'Uploaded File',
         sourceConfig: {
-          originalName: file.originalname,
-          mimeType: file.mimetype,
-          url: uploadResult.url
+          originalName: originalName || 'file',
+          mimeType: mimeType || 'application/octet-stream',
+          url: url
         },
-        fileSizeBytes: file.size,
-        r2Key: fileKey,
+        fileSizeBytes: fileSize || 0,
+        r2Key: null, // No longer storing R2 key since file is uploaded directly
         status: 'processing'
       }
     });
@@ -113,15 +92,7 @@ export const createFileSource = async (req, res) => {
     // TODO: Queue file processing job (extract text, chunk, embed)
     // This would typically be done with a background job system
 
-    const response = {
-      id: dataSource.id,
-      type: dataSource.type,
-      name: dataSource.name,
-      status: dataSource.status,
-      file_size_bytes: dataSource.fileSizeBytes,
-      r2_key: dataSource.r2Key,
-      created_at: dataSource.createdAt
-    };
+    const response = convertPrismaToApiResponse(dataSource, 'source');
 
     res.status(201).json(createSuccessResponse(response));
   } catch (error) {
@@ -138,8 +109,8 @@ export const createWebsiteSource = async (req, res) => {
     const { url, crawl_subpages = false, max_pages = 10 } = req.body;
 
     // Verify agent ownership
-    const agent = await prisma.agent.findFirst({
-      where: { id: agentId, userId }
+    const agent = await prisma.chatbots.findFirst({
+      where: { id: agentId, user_id: userId }
     });
 
     if (!agent) {
@@ -155,7 +126,7 @@ export const createWebsiteSource = async (req, res) => {
 
     const dataSource = await prisma.dataSource.create({
       data: {
-        agentId,
+        chatbot_id: agentId,
         type: 'website',
         name: url,
         sourceConfig: {
@@ -170,17 +141,7 @@ export const createWebsiteSource = async (req, res) => {
     // TODO: Queue website crawling job
     // This would typically be done with a background job system
 
-    const response = {
-      id: dataSource.id,
-      type: dataSource.type,
-      name: dataSource.name,
-      status: dataSource.status,
-      source_config: {
-        url: url,
-        crawl_subpages: crawl_subpages,
-        max_pages: max_pages
-      }
-    };
+    const response = convertPrismaToApiResponse(dataSource, 'source');
 
     res.status(201).json(createSuccessResponse(response));
   } catch (error) {
@@ -201,8 +162,8 @@ export const createTextSource = async (req, res) => {
     }
 
     // Verify agent ownership
-    const agent = await prisma.agent.findFirst({
-      where: { id: agentId, userId }
+    const agent = await prisma.chatbots.findFirst({
+      where: { id: agentId, user_id: userId }
     });
 
     if (!agent) {
@@ -211,7 +172,7 @@ export const createTextSource = async (req, res) => {
 
     const dataSource = await prisma.dataSource.create({
       data: {
-        agentId,
+        chatbot_id: agentId,
         type: 'text',
         name,
         sourceConfig: {
@@ -225,13 +186,7 @@ export const createTextSource = async (req, res) => {
     // TODO: Queue text processing job (chunk, embed)
     // This would typically be done with a background job system
 
-    const response = {
-      id: dataSource.id,
-      type: dataSource.type,
-      name: dataSource.name,
-      status: dataSource.status,
-      char_count: dataSource.charCount
-    };
+    const response = convertPrismaToApiResponse(dataSource, 'source');
 
     res.status(201).json(createSuccessResponse(response));
   } catch (error) {
@@ -247,8 +202,8 @@ export const deleteSource = async (req, res) => {
     const { agentId, sourceId } = req.params;
 
     // Verify agent ownership
-    const agent = await prisma.agent.findFirst({
-      where: { id: agentId, userId }
+    const agent = await prisma.chatbots.findFirst({
+      where: { id: agentId, user_id: userId }
     });
 
     if (!agent) {
@@ -257,21 +212,16 @@ export const deleteSource = async (req, res) => {
 
     // Get source details
     const source = await prisma.dataSource.findFirst({
-      where: { id: sourceId, agentId }
+      where: { id: sourceId, chatbot_id: agentId }
     });
 
     if (!source) {
       return res.status(404).json(createErrorResponse('Source not found'));
     }
 
-    // Delete from R2 if it's a file
-    if (source.type === 'file' && source.r2Key) {
-      try {
-        await storageService.deleteFile(source.r2Key);
-      } catch (error) {
-        logger.warn('Failed to delete file from R2:', error);
-      }
-    }
+    // Note: Files are now uploaded directly from frontend to R2
+    // Backend doesn't manage file deletion from R2 anymore
+    // Frontend should handle file deletion from R2 when deleting sources
 
     // Delete vectors from Pinecone
     try {
@@ -286,16 +236,6 @@ export const deleteSource = async (req, res) => {
     // Delete source record
     await prisma.dataSource.delete({
       where: { id: sourceId }
-    });
-
-    // Update agent sources count
-    await prisma.agent.update({
-      where: { id: agentId },
-      data: {
-        sourcesCount: {
-          decrement: 1
-        }
-      }
     });
 
     res.json(createSuccessResponse({
@@ -315,8 +255,8 @@ export const reprocessSource = async (req, res) => {
     const { agentId, sourceId } = req.params;
 
     // Verify agent ownership
-    const agent = await prisma.agent.findFirst({
-      where: { id: agentId, userId }
+    const agent = await prisma.chatbots.findFirst({
+      where: { id: agentId, user_id: userId }
     });
 
     if (!agent) {
@@ -325,7 +265,7 @@ export const reprocessSource = async (req, res) => {
 
     // Get source
     const source = await prisma.dataSource.findFirst({
-      where: { id: sourceId, agentId }
+      where: { id: sourceId, chatbot_id: agentId }
     });
 
     if (!source) {
@@ -351,6 +291,50 @@ export const reprocessSource = async (req, res) => {
     }));
   } catch (error) {
     logger.error('Reprocess source error:', error);
+    res.status(500).json(createErrorResponse('Internal server error'));
+  }
+};
+
+// POST /api/agents/:agentId/sources/upload-url
+export const getUploadUrl = async (req, res) => {
+  try {
+    const userId = await getUserIdFromClerkId(req.auth.userId);
+    const { agentId } = req.params;
+    const { fileName, contentType } = req.body;
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+    const bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME;
+    if (!fileName) {
+      return res.status(400).json(createErrorResponse('File name is required'));
+    }
+
+    // Verify agent ownership
+    const agent = await prisma.chatbots.findFirst({
+      where: { id: agentId, user_id: userId }
+    });
+
+    if (!agent) {
+      return res.status(404).json(createErrorResponse('Agent not found'));
+    }
+
+    // Generate a unique file key
+    const fileKey = storageService.generateFileKey(userId, fileName, 'sources');
+    
+    // Generate presigned upload URL
+    const uploadUrl = await storageService.generatePresignedUploadUrl(
+      fileKey,
+      contentType || 'application/octet-stream',
+      3600 // 1 hour expiry
+    );
+
+    res.json(createSuccessResponse({
+      uploadUrl,
+      fileKey,
+      accountId,
+      bucket,
+      expiresIn: 3600
+    }));
+  } catch (error) {
+    logger.error('Get upload URL error:', error);
     res.status(500).json(createErrorResponse('Internal server error'));
   }
 };

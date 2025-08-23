@@ -1,41 +1,31 @@
-import { PrismaClient } from '../generated/prisma/index.js';
+import { prisma } from '../config/prisma.js';
 import { createSuccessResponse, createErrorResponse } from '../utils/response.js';
 import logger from '../utils/logger.js';
 import { nanoid } from 'nanoid';
-
-const prisma = new PrismaClient();
+import { convertPrismaToApiResponse, convertPrismaArrayToApiResponse } from '../utils/caseConverter.js';
 
 // GET /api/agents
 export const getAgents = async (req, res) => {
   try {
     const userId = await getUserIdFromClerkId(req.auth.userId);
 
-    const agents = await prisma.agent.findMany({
-      where: { userId },
+    const agents = await prisma.chatbots.findMany({
+      where: { user_id: userId },
       select: {
         id: true,
         name: true,
         slug: true,
-        status: true,
+        is_active: true,
         model: true,
-        messageCount: true,
-        lastMessageAt: true,
-        createdAt: true
+        message_count: true,
+        last_message_at: true,
+        created_at: true
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { created_at: 'desc' }
     });
 
     const response = {
-      agents: agents.map(agent => ({
-        id: agent.id,
-        name: agent.name,
-        slug: agent.slug,
-        status: agent.status,
-        model: agent.model,
-        message_count: agent.messageCount,
-        last_message_at: agent.lastMessageAt,
-        created_at: agent.createdAt
-      }))
+      agents: convertPrismaArrayToApiResponse(agents, 'agent')
     };
 
     res.json(createSuccessResponse(response));
@@ -49,15 +39,15 @@ export const getAgents = async (req, res) => {
 export const createAgent = async (req, res) => {
   try {
     const userId = await getUserIdFromClerkId(req.auth.userId);
-    const { name, model = 'gpt-4o-mini', temperature = 0.7, system_prompt } = req.body;
+    const { name, model = 'gpt-4o-mini', temperature = 0.7, systemPrompt } = req.body;
 
     // Check agent limit
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { _count: { select: { agents: true } } }
+      include: { _count: { select: { chatbots: true } } }
     });
 
-    if (user._count.agents >= user.agentLimit) {
+    if (user._count.chatbots >= user.chatbot_limit) {
       return res.status(400).json(createErrorResponse('Agent limit reached'));
     }
 
@@ -66,40 +56,24 @@ export const createAgent = async (req, res) => {
     const publicId = `pub_${nanoid(10)}`;
     const vectorNamespace = `ns_${nanoid(10)}`;
 
-    const agent = await prisma.agent.create({
+    const agent = await prisma.chatbots.create({
       data: {
-        userId,
+        user_id: userId,
         name,
         slug,
         model,
         temperature,
-        systemPrompt: system_prompt,
-        publicId,
-        vectorNamespace,
-        deploySettings: {
-          initial_message: "Hi! How can I help you today?",
-          suggested_messages: [],
-          message_placeholder: "Type your message...",
-          theme: "light",
-          bubble_color: "#000000",
-          bubble_position: "bottom-right",
-          display_name: name,
-          profile_picture_url: null,
-          collect_user_info: false,
-          show_sources: true
-        }
+        system_prompt: systemPrompt,
+        public_id: publicId,
+        vector_namespace: vectorNamespace,
+        welcome_message: "Hi! How can I help you today?",
+        suggested_questions: [],
+        theme_color: "#000000",
+        is_active: true
       }
     });
 
-    const response = {
-      id: agent.id,
-      name: agent.name,
-      slug: agent.slug,
-      public_id: agent.publicId,
-      vector_namespace: agent.vectorNamespace,
-      status: agent.status,
-      created_at: agent.createdAt
-    };
+    const response = convertPrismaToApiResponse(agent, 'agent');
 
     res.status(201).json(createSuccessResponse(response));
   } catch (error) {
@@ -114,20 +88,19 @@ export const getAgent = async (req, res) => {
     const userId = await getUserIdFromClerkId(req.auth.userId);
     const { id } = req.params;
 
-    const agent = await prisma.agent.findFirst({
-      where: { id, userId },
+    const agent = await prisma.chatbots.findFirst({
+      where: { id, user_id: userId },
       select: {
         id: true,
         name: true,
         slug: true,
-        status: true,
+        is_active: true,
         model: true,
         temperature: true,
-        systemPrompt: true,
-        publicId: true,
-        messageCount: true,
-        sourcesCount: true,
-        createdAt: true
+        system_prompt: true,
+        public_id: true,
+        message_count: true,
+        created_at: true
       }
     });
 
@@ -135,19 +108,7 @@ export const getAgent = async (req, res) => {
       return res.status(404).json(createErrorResponse('Agent not found'));
     }
 
-    const response = {
-      id: agent.id,
-      name: agent.name,
-      slug: agent.slug,
-      status: agent.status,
-      model: agent.model,
-      temperature: agent.temperature,
-      system_prompt: agent.systemPrompt,
-      public_id: agent.publicId,
-      message_count: agent.messageCount,
-      sources_count: agent.sourcesCount,
-      created_at: agent.createdAt
-    };
+    const response = convertPrismaToApiResponse(agent, 'agent');
 
     res.json(createSuccessResponse(response));
   } catch (error) {
@@ -161,11 +122,11 @@ export const updateAgent = async (req, res) => {
   try {
     const userId = await getUserIdFromClerkId(req.auth.userId);
     const { id } = req.params;
-    const { name, model, temperature, system_prompt, status } = req.body;
+    const { name, model, temperature, systemPrompt, status } = req.body;
 
     // Check if agent exists and belongs to user
-    const existingAgent = await prisma.agent.findFirst({
-      where: { id, userId }
+    const existingAgent = await prisma.chatbots.findFirst({
+      where: { id, user_id: userId }
     });
 
     if (!existingAgent) {
@@ -176,20 +137,15 @@ export const updateAgent = async (req, res) => {
     if (name !== undefined) updateData.name = name;
     if (model !== undefined) updateData.model = model;
     if (temperature !== undefined) updateData.temperature = temperature;
-    if (system_prompt !== undefined) updateData.systemPrompt = system_prompt;
-    if (status !== undefined) updateData.status = status;
+    if (systemPrompt !== undefined) updateData.system_prompt = systemPrompt;
+    if (status !== undefined) updateData.is_active = status;
 
-    const agent = await prisma.agent.update({
+    const agent = await prisma.chatbots.update({
       where: { id },
       data: updateData
     });
 
-    const response = {
-      id: agent.id,
-      name: agent.name,
-      status: agent.status,
-      updated_at: agent.updatedAt
-    };
+    const response = convertPrismaToApiResponse(agent, 'agent');
 
     res.json(createSuccessResponse(response));
   } catch (error) {
@@ -205,8 +161,8 @@ export const deleteAgent = async (req, res) => {
     const { id } = req.params;
 
     // Check if agent exists and belongs to user
-    const existingAgent = await prisma.agent.findFirst({
-      where: { id, userId }
+    const existingAgent = await prisma.chatbots.findFirst({
+      where: { id, user_id: userId }
     });
 
     if (!existingAgent) {
@@ -214,7 +170,7 @@ export const deleteAgent = async (req, res) => {
     }
 
     // Delete agent (cascade will handle related data)
-    await prisma.agent.delete({
+    await prisma.chatbots.delete({
       where: { id }
     });
 

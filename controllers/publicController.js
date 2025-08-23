@@ -1,10 +1,9 @@
-import { PrismaClient } from '../generated/prisma/index.js';
+import { prisma } from '../config/prisma.js';
 import { createSuccessResponse, createErrorResponse } from '../utils/response.js';
 import vectorService from '../services/vectorService.js';
 import logger from '../utils/logger.js';
 import { nanoid } from 'nanoid';
-
-const prisma = new PrismaClient();
+import { convertPrismaToApiResponse } from '../utils/caseConverter.js';
 
 // GET /api/public/agents/:publicId/config
 export const getAgentConfig = async (req, res) => {
@@ -29,12 +28,12 @@ export const getAgentConfig = async (req, res) => {
 
     const response = {
       name: agent.name,
-      initial_message: settings.initial_message || "Hi! How can I help?",
-      suggested_messages: settings.suggested_messages || [],
+      initialMessage: settings.initial_message || "Hi! How can I help?",
+      suggestedMessages: settings.suggested_messages || [],
       theme: settings.theme || "light",
-      bubble_color: settings.bubble_color || "#000000",
-      display_name: settings.display_name || agent.name,
-      profile_picture_url: settings.profile_picture_url || null
+      bubbleColor: settings.bubble_color || "#000000",
+      displayName: settings.display_name || agent.name,
+      profilePictureUrl: settings.profile_picture_url || null
     };
 
     res.json(createSuccessResponse(response));
@@ -156,7 +155,7 @@ export const sendPublicMessage = async (req, res) => {
     const response = {
       response: mockResponse,
       sources: mockSources,
-      session_id: sessionId
+      sessionId: sessionId
     };
 
     // For streaming implementation, you would use Server-Sent Events (SSE)

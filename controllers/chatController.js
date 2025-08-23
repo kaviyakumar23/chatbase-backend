@@ -1,10 +1,9 @@
-import { PrismaClient } from '../generated/prisma/index.js';
+import { prisma } from '../config/prisma.js';
 import { createSuccessResponse, createErrorResponse } from '../utils/response.js';
 import vectorService from '../services/vectorService.js';
 import logger from '../utils/logger.js';
 import { nanoid } from 'nanoid';
-
-const prisma = new PrismaClient();
+import { convertPrismaToApiResponse, convertPrismaArrayToApiResponse } from '../utils/caseConverter.js';
 
 // POST /api/agents/:agentId/chat (Widget API)
 export const sendMessage = async (req, res) => {
@@ -102,8 +101,8 @@ export const sendMessage = async (req, res) => {
     const response = {
       response: mockResponse,
       sources: mockSources,
-      session_id: sessionId,
-      message_id: assistantMessage.id
+      sessionId: sessionId,
+      messageId: assistantMessage.id
     };
 
     res.json(createSuccessResponse(response));
@@ -177,17 +176,7 @@ export const getChatLogs = async (req, res) => {
       prisma.conversation.count({ where: whereClause })
     ]);
 
-    const sessions = conversations.map(conv => ({
-      id: conv.id,
-      session_id: conv.sessionId,
-      started_at: conv.startedAt,
-      message_count: conv.messageCount,
-      messages: conv.messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-        created_at: msg.createdAt
-      }))
-    }));
+    const sessions = convertPrismaArrayToApiResponse(conversations, 'conversation');
 
     const totalPages = Math.ceil(totalCount / parseInt(limit));
 

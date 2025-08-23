@@ -1,8 +1,7 @@
-import { PrismaClient } from '../generated/prisma/index.js';
+import { prisma } from '../config/prisma.js';
 import { createSuccessResponse, createErrorResponse } from '../utils/response.js';
 import logger from '../utils/logger.js';
-
-const prisma = new PrismaClient();
+import { convertPrismaToApiResponse, convertPrismaArrayToApiResponse } from '../utils/caseConverter.js';
 
 // GET /api/usage
 export const getUsage = async (req, res) => {
@@ -60,13 +59,13 @@ export const getUsage = async (req, res) => {
     });
 
     const response = {
-      current_month: {
+      currentMonth: {
         messages: currentUsage?.totalMessages || 0,
-        messages_limit: user.messageLimit,
+        messagesLimit: user.messageLimit,
         tokens: currentUsage?.totalTokens || 0,
-        storage_bytes: Number(currentUsage?.storageBytesUsed || 0),
-        agents_count: user._count.agents,
-        agents_limit: user.agentLimit
+        storageBytes: Number(currentUsage?.storageBytesUsed || 0),
+        agentsCount: user._count.agents,
+        agentsLimit: user.agentLimit
       },
       history: historicalUsage.map(usage => ({
         month: usage.month.toISOString().slice(0, 7), // YYYY-MM format

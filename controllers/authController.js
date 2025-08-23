@@ -1,13 +1,15 @@
-import { PrismaClient } from '../generated/prisma/index.js';
+import { prisma } from '../config/prisma.js';
 import { createSuccessResponse, createErrorResponse } from '../utils/response.js';
 import logger from '../utils/logger.js';
-
-const prisma = new PrismaClient();
+import { convertPrismaToApiResponse } from '../utils/caseConverter.js';
 
 // POST /api/auth/webhook (Clerk Webhook)
 export const handleClerkWebhook = async (req, res) => {
   try {
-    const { type, data } = req.body;
+    // Use the verified webhook payload from the middleware
+    const { type, data } = req.webhookPayload;
+
+    logger.info(`Processing Clerk webhook: ${type}`);
 
     switch (type) {
       case 'user.created':
@@ -23,7 +25,10 @@ export const handleClerkWebhook = async (req, res) => {
         logger.warn(`Unhandled webhook type: ${type}`);
     }
 
-    res.json(createSuccessResponse({ success: true }));
+    res.json(createSuccessResponse({ 
+      success: true, 
+      message: `Webhook ${type} processed successfully` 
+    }));
   } catch (error) {
     logger.error('Clerk webhook error:', error);
     res.status(500).json(createErrorResponse('Internal server error'));
@@ -77,13 +82,13 @@ export const getCurrentUser = async (req, res) => {
     const response = {
       id: user.id,
       email: user.email,
-      full_name: user.fullName,
-      plan_type: user.planType,
-      agent_limit: user.agentLimit,
-      message_limit: user.messageLimit,
-      current_usage: {
-        agents_count: user._count.agents,
-        messages_this_month: usage?.totalMessages || 0
+      fullName: user.fullName,
+      planType: user.planType,
+      agentLimit: user.agentLimit,
+      messageLimit: user.messageLimit,
+      currentUsage: {
+        agentsCount: user._count.agents,
+        messagesThisMonth: usage?.totalMessages || 0
       }
     };
 

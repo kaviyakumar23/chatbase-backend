@@ -23,8 +23,26 @@ const sendPaginated = (res, data, pagination, message = 'Success') => {
   });
 };
 
+const createSuccessResponse = (data, message = 'Success') => {
+  return {
+    success: true,
+    message,
+    data
+  };
+};
+
+const createErrorResponse = (message = 'Error', errors = null) => {
+  return {
+    success: false,
+    message,
+    ...(errors && { errors })
+  };
+};
+
 export {
   sendSuccess,
   sendError,
-  sendPaginated
+  sendPaginated,
+  createSuccessResponse,
+  createErrorResponse
 };

@@ -13,7 +13,7 @@ import {
   createTextSource,
   deleteSource,
   reprocessSource,
-  upload
+  getUploadUrl
 } from '../controllers/sourceController.js';
 
 const router = express.Router();
@@ -21,8 +21,11 @@ const router = express.Router();
 // GET /api/agents/:agentId/sources
 router.get('/:agentId/sources', requireAuth, validateUUIDParam('agentId'), validatePagination, getSources);
 
+// POST /api/agents/:agentId/sources/upload-url
+router.post('/:agentId/sources/upload-url', requireAuth, validateUUIDParam('agentId'), getUploadUrl);
+
 // POST /api/agents/:agentId/sources/file
-router.post('/:agentId/sources/file', requireAuth, validateUUIDParam('agentId'), upload.single('file'), createFileSource);
+router.post('/:agentId/sources/file', requireAuth, validateUUIDParam('agentId'), createFileSource);
 
 // POST /api/agents/:agentId/sources/website
 router.post('/:agentId/sources/website', requireAuth, validateCreateWebsiteSource, createWebsiteSource);

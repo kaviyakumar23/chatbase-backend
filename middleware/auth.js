@@ -1,18 +1,32 @@
-import { requireAuth as clerkRequireAuth } from '@clerk/express';
-
-let requireAuthMiddleware = null;
-
-const getRequireAuth = () => {
-  if (!requireAuthMiddleware) {
-    requireAuthMiddleware = clerkRequireAuth({
-      secretKey: process.env.CLERK_SECRET_KEY,
-    });
-  }
-  return requireAuthMiddleware;
-};
+import { getAuth } from '@clerk/express';
 
 const requireAuth = (req, res, next) => {
-  return getRequireAuth()(req, res, next);
+  try {
+    const auth = getAuth(req);
+    
+    if (!auth.userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        error: 'UNAUTHORIZED'
+      });
+    }
+    
+    // Attach user info to request for use in controllers
+    req.user = {
+      id: auth.userId,
+      sessionId: auth.sessionId,
+      sessionClaims: auth.sessionClaims
+    };
+    
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+      error: 'UNAUTHORIZED'
+    });
+  }
 };
 
 const optionalAuth = (req, res, next) => {

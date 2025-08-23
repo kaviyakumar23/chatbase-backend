@@ -1,10 +1,9 @@
-import { PrismaClient } from '../generated/prisma/index.js';
+import { prisma } from '../config/prisma.js';
 import { createSuccessResponse, createErrorResponse } from '../utils/response.js';
 import storageService from '../services/storageService.js';
 import logger from '../utils/logger.js';
 import { nanoid } from 'nanoid';
-
-const prisma = new PrismaClient();
+import { convertPrismaArrayToApiResponse } from '../utils/caseConverter.js';
 
 // GET /api/agents/:agentId/leads
 export const getLeads = async (req, res) => {
@@ -56,16 +55,7 @@ export const getLeads = async (req, res) => {
     ]);
 
     const response = {
-      leads: leads.map(lead => ({
-        id: lead.id,
-        email: lead.email,
-        name: lead.name,
-        phone: lead.phone,
-        captured_at: lead.capturedAt,
-        session_id: lead.sessionId,
-        metadata: lead.metadata,
-        exported: lead.exported
-      })),
+      leads: convertPrismaArrayToApiResponse(leads, 'lead'),
       total: totalCount,
       page: parseInt(page)
     };
