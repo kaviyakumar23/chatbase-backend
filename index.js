@@ -9,6 +9,7 @@ import config from './config/index.js';
 import routes from './routes/index.js';
 import { errorHandler, notFound } from './middleware/index.js';
 import logger from './utils/logger.js';
+import './workers/sourceProcessor.js'; // Initialize worker
 
 const app = express();
 
@@ -51,10 +52,19 @@ app.use(errorHandler);
 
 const PORT = config.port;
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   logger.info(`Server running on port ${PORT} in ${config.nodeEnv} mode`);
   logger.info('Available routes:');
   logger.info('  GET  /api/v1/health');
+  
+  // Initialize worker connection
+  try {
+    const { createRedisConnection } = await import('./config/redis.js');
+    await createRedisConnection();
+    logger.info('Background job processor initialized');
+  } catch (error) {
+    logger.error('Failed to initialize job processor:', error);
+  }
 });
 
 const gracefulShutdown = (signal) => {

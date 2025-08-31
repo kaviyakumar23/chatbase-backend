@@ -2,6 +2,8 @@ import { prisma } from '../config/prisma.js';
 import { createSuccessResponse, createErrorResponse } from '../utils/response.js';
 import storageService from '../services/storageService.js';
 import vectorService from '../services/vectorService.js';
+import jobService from '../services/jobService.js';
+import { addProcessingJob } from '../workers/sourceProcessor.js';
 import logger from '../utils/logger.js';
 import { convertPrismaArrayToApiResponse, convertPrismaToApiResponse } from '../utils/caseConverter.js';
 
@@ -85,14 +87,28 @@ export const createFileSource = async (req, res) => {
         },
         fileSizeBytes: fileSize || 0,
         r2Key: null, // No longer storing R2 key since file is uploaded directly
-        status: 'processing'
+        status: 'pending'
       }
     });
 
-    // TODO: Queue file processing job (extract text, chunk, embed)
-    // This would typically be done with a background job system
+    // Create processing job
+    const job = await jobService.createJob({
+      dataSourceId: dataSource.id,
+      type: 'process_file',
+      priority: 5
+    });
 
-    const response = convertPrismaToApiResponse(dataSource, 'source');
+    // Add job to processing queue
+    await addProcessingJob({
+      jobId: job.id,
+      dataSourceId: dataSource.id,
+      type: 'process_file'
+    });
+
+    const response = {
+      ...convertPrismaToApiResponse(dataSource, 'source'),
+      jobId: job.id
+    };
 
     res.status(201).json(createSuccessResponse(response));
   } catch (error) {
@@ -134,14 +150,28 @@ export const createWebsiteSource = async (req, res) => {
           crawl_subpages,
           max_pages
         },
-        status: 'processing'
+        status: 'pending'
       }
     });
 
-    // TODO: Queue website crawling job
-    // This would typically be done with a background job system
+    // Create processing job
+    const job = await jobService.createJob({
+      dataSourceId: dataSource.id,
+      type: 'crawl_website',
+      priority: 3 // Lower priority for website crawling
+    });
 
-    const response = convertPrismaToApiResponse(dataSource, 'source');
+    // Add job to processing queue
+    await addProcessingJob({
+      jobId: job.id,
+      dataSourceId: dataSource.id,
+      type: 'crawl_website'
+    });
+
+    const response = {
+      ...convertPrismaToApiResponse(dataSource, 'source'),
+      jobId: job.id
+    };
 
     res.status(201).json(createSuccessResponse(response));
   } catch (error) {
@@ -179,14 +209,28 @@ export const createTextSource = async (req, res) => {
           content
         },
         charCount: content.length,
-        status: 'processing'
+        status: 'pending'
       }
     });
 
-    // TODO: Queue text processing job (chunk, embed)
-    // This would typically be done with a background job system
+    // Create processing job
+    const job = await jobService.createJob({
+      dataSourceId: dataSource.id,
+      type: 'process_text',
+      priority: 10 // Higher priority for text (immediate processing)
+    });
 
-    const response = convertPrismaToApiResponse(dataSource, 'source');
+    // Add job to processing queue
+    await addProcessingJob({
+      jobId: job.id,
+      dataSourceId: dataSource.id,
+      type: 'process_text'
+    });
+
+    const response = {
+      ...convertPrismaToApiResponse(dataSource, 'source'),
+      jobId: job.id
+    };
 
     res.status(201).json(createSuccessResponse(response));
   } catch (error) {
@@ -223,17 +267,44 @@ export const deleteSource = async (req, res) => {
     // Backend doesn't manage file deletion from R2 anymore
     // Frontend should handle file deletion from R2 when deleting sources
 
+    // Cancel any pending jobs for this source
+    try {
+      const pendingJobs = await prisma.job.findMany({
+        where: { 
+          dataSourceId: sourceId,
+          status: { in: ['pending', 'processing'] }
+        }
+      });
+
+      if (pendingJobs.length > 0) {
+        await prisma.job.updateMany({
+          where: { 
+            dataSourceId: sourceId,
+            status: { in: ['pending', 'processing'] }
+          },
+          data: { 
+            status: 'cancelled',
+            completedAt: new Date()
+          }
+        });
+        logger.info(`Cancelled ${pendingJobs.length} pending jobs for source ${sourceId}`);
+      }
+    } catch (error) {
+      logger.warn('Failed to cancel pending jobs:', error);
+    }
+
     // Delete vectors from Pinecone
     try {
       await vectorService.deleteByFilter({
         agent_id: agentId,
         source_id: sourceId
       });
+      logger.info(`Deleted vectors from Pinecone for source ${sourceId}`);
     } catch (error) {
       logger.warn('Failed to delete vectors from Pinecone:', error);
     }
 
-    // Delete source record
+    // Delete source record (this will cascade delete jobs due to foreign key)
     await prisma.dataSource.delete({
       where: { id: sourceId }
     });
@@ -272,21 +343,36 @@ export const reprocessSource = async (req, res) => {
       return res.status(404).json(createErrorResponse('Source not found'));
     }
 
-    // Update status to processing
+    // Update status to pending
     const updatedSource = await prisma.dataSource.update({
       where: { id: sourceId },
       data: {
-        status: 'processing',
+        status: 'pending',
         errorMessage: null
       }
     });
 
-    // TODO: Queue reprocessing job
-    // This would typically be done with a background job system
+    // Create reprocessing job
+    const jobType = source.type === 'file' ? 'process_file' : 
+                   source.type === 'website' ? 'crawl_website' : 'process_text';
+    
+    const job = await jobService.createJob({
+      dataSourceId: sourceId,
+      type: jobType,
+      priority: 8 // High priority for reprocessing
+    });
+
+    // Add job to processing queue
+    await addProcessingJob({
+      jobId: job.id,
+      dataSourceId: sourceId,
+      type: jobType
+    });
 
     res.json(createSuccessResponse({
       id: updatedSource.id,
       status: updatedSource.status,
+      jobId: job.id,
       message: 'Source queued for reprocessing'
     }));
   } catch (error) {
