@@ -40,10 +40,36 @@ model DataSource {
   createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   chatbots      chatbots  @relation(fields: [chatbot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  jobs          Job[]
 
   @@index([chatbot_id], map: "idx_data_sources_chatbot")
   @@index([status], map: "idx_data_sources_status")
   @@map("data_sources")
+}
+
+model Job {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  dataSourceId  String    @map("data_source_id") @db.Uuid
+  type          String    @db.VarChar(50) // 'process_file', 'process_text', 'crawl_website'
+  status        String    @default("pending") @db.VarChar(50) // 'pending', 'processing', 'completed', 'failed'
+  priority      Int       @default(0)
+  progress      Json?     @default("{}")
+  result        Json?
+  errorMessage  String?   @map("error_message")
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(3) @map("max_attempts")
+  scheduledFor  DateTime? @map("scheduled_for") @db.Timestamptz(6)
+  startedAt     DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  dataSource    DataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([status], map: "idx_jobs_status")
+  @@index([type], map: "idx_jobs_type")
+  @@index([dataSourceId], map: "idx_jobs_data_source")
+  @@index([scheduledFor], map: "idx_jobs_scheduled")
+  @@map("jobs")
 }
 
 model Conversation {
